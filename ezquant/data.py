@@ -1,149 +1,225 @@
+
 """
 数据获取模块
 ============
-基于 yfinance 获取A股ETF行情数据。
+使用腾讯财经接口获取 A 股 ETF 历史日线行情。
 
-用法：
-    from ezquant.data import get_etf, get_etfs, ETF_POOL
-
-    # 获取单只ETF
-    df = get_etf("沪深300")
-
-    # 批量获取多只ETF收盘价
-    prices = get_etfs(["沪深300", "中证红利", "黄金ETF"])
+支持：
+1. ETF 中文名称或六位代码
+2. 前复权、后复权、不复权
+3. 单只 ETF 和批量 ETF 获取
+4. 保持原项目 get_etf / get_etfs 接口兼容
 """
 
+import json
+import re
+from datetime import datetime
+
 import pandas as pd
-import yfinance as yf
-import warnings
+import requests
 
-warnings.filterwarnings("ignore")
 
-# ==================== 常用A股ETF池 ====================
-# 键为中文简称，值为yfinance代码（.SS=上交所，.SZ=深交所）
 ETF_POOL = {
-    # 红利类
-    "中证红利": "515080.SS",
-    "红利低波": "512890.SS",
-    "红利ETF": "510880.SS",
-    # 债券类
-    "国债ETF": "511010.SS",
-    "十年国债": "511260.SS",
-    # 商品
-    "黄金ETF": "518880.SS",
-    # 宽基指数
-    "沪深300": "510300.SS",
-    "中证500": "510500.SS",
-    "上证50": "510050.SS",
-    "创业板": "159915.SZ",
-    # 行业
-    "医药ETF": "512010.SS",
-    "消费ETF": "159928.SZ",
-    "银行ETF": "512800.SS",
-    # 跨境
-    "纳指ETF": "513100.SS",
-    "标普500": "513500.SS",
-    "恒生ETF": "159920.SZ",
+    "中证红利": "515080",
+    "红利低波": "512890",
+    "红利ETF": "510880",
+    "国债ETF": "511010",
+    "十年国债": "511260",
+    "黄金ETF": "518880",
+    "沪深300": "510300",
+    "中证500": "510500",
+    "上证50": "510050",
+    "创业板": "159915",
+    "医药ETF": "512010",
+    "消费ETF": "159928",
+    "银行ETF": "512800",
+    "纳指ETF": "513100",
+    "标普500": "513500",
+    "恒生ETF": "159920",
 }
 
 
+def _normalize_code(code):
+    """将代码转换为腾讯接口使用的 sh/sz 格式。"""
+    code = str(code).strip()
+
+    if "." in code:
+        code = code.split(".")[0]
+
+    if not code.isdigit() or len(code) != 6:
+        raise ValueError(f"ETF代码格式不正确：{code}")
+
+    # 上海市场：5、6、9 开头；深圳市场：0、1、2、3 开头
+    if code.startswith(("5", "6", "9")):
+        return "sh" + code
+
+    if code.startswith(("0", "1", "2", "3")):
+        return "sz" + code
+
+    raise ValueError(f"无法识别交易所：{code}")
+
+
 def get_etf(
-    name_or_ticker: str,
-    start: str = "2020-01-01",
-    end: str = None,
-) -> pd.DataFrame:
+    name_or_ticker,
+    start="2020-01-01",
+    end=None,
+    adjust="qfq",
+):
     """
-    获取单只ETF的历史行情数据。
+    获取单只 ETF 的历史日线数据。
 
-    参数：
-        name_or_ticker: ETF中文名（如"沪深300"）或yfinance代码（如"510300.SS"）
-        start: 开始日期，格式 "YYYY-MM-DD"，默认 "2020-01-01"
-        end:   结束日期，默认到最新
-
-    返回：
-        DataFrame，包含 Open/High/Low/Close/Volume 列，索引为日期
+    adjust:
+        qfq  = 前复权
+        hfq  = 后复权
+        空字符串 = 不复权
     """
-    # 如果传入的是中文名称，从ETF池查找对应代码
+
     if name_or_ticker in ETF_POOL:
-        ticker = ETF_POOL[name_or_ticker]
-    elif "." in name_or_ticker:
-        # 已经是完整的 yfinance 代码
-        ticker = name_or_ticker
+        raw_code = ETF_POOL[name_or_ticker]
     else:
-        # 尝试自动补全后缀（6位数字代码）
-        ticker = _guess_ticker(name_or_ticker)
+        raw_code = str(name_or_ticker)
 
-    df = yf.download(ticker, start=start, end=end, progress=False)
+    symbol = _normalize_code(raw_code)
 
-    if df is None or df.empty:
-        raise ValueError(f"无法获取 {name_or_ticker}({ticker}) 的数据，请检查代码是否正确")
+    if adjust not in ("", "qfq", "hfq"):
+        raise ValueError("adjust 只能是 qfq、hfq 或空字符串")
 
-    # yfinance 有时返回 MultiIndex 列，统一处理
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
+    start_date = pd.Timestamp(start).strftime("%Y-%m-%d")
+    end_date = (
+        pd.Timestamp(end).strftime("%Y-%m-%d")
+        if end else datetime.today().strftime("%Y-%m-%d")
+    )
 
-    # 确保索引是 DatetimeIndex
-    df.index = pd.to_datetime(df.index)
+    # 腾讯财经历史 K 线接口
+    url = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
+
+    params = {
+        "param": f"{symbol},day,{start_date},{end_date},2000,{adjust}"
+    }
+
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Referer": "https://finance.qq.com/",
+    }
+
+    try:
+        response = requests.get(
+            url,
+            params=params,
+            headers=headers,
+            timeout=15,
+        )
+        response.raise_for_status()
+
+        raw_text = response.text.strip()
+
+        # 兼容 JSONP 格式
+        if "=" in raw_text and not raw_text.startswith("{"):
+            raw_text = raw_text.split("=", 1)[1].strip()
+            raw_text = raw_text.rstrip(";")
+
+        data = json.loads(raw_text)
+
+    except Exception as e:
+        raise RuntimeError(
+            f"腾讯接口请求失败：{name_or_ticker}({symbol})：{e}"
+        ) from e
+
+    if data.get("code") != 0:
+        raise RuntimeError(
+            f"腾讯接口返回异常：{data.get('msg', data)}"
+        )
+
+    node = data.get("data", {}).get(symbol)
+
+    if not node:
+        raise ValueError(f"腾讯接口没有返回 {symbol} 的行情数据")
+
+    # 腾讯不同标的可能返回不同的 K 线字段名
+    if adjust == "qfq":
+        rows = node.get("qfqday") or node.get("day")
+    elif adjust == "hfq":
+        rows = node.get("hfqday") or node.get("day")
+    else:
+        rows = node.get("day")
+
+    if not rows:
+        raise ValueError(f"{name_or_ticker} 没有获取到历史 K 线数据")
+
+    # 腾讯 K 线格式：
+    # 日期、开盘、收盘、最高、最低、成交量
+    df = pd.DataFrame(
+        rows,
+        columns=["Date", "Open", "Close", "High", "Low", "Volume"]
+        + [f"Extra_{i}" for i in range(max(0, len(rows[0]) - 6))]
+    )
+
+    df = df[["Date", "Open", "Close", "High", "Low", "Volume"]]
+
+    df["Date"] = pd.to_datetime(df["Date"])
+
+    for col in ["Open", "Close", "High", "Low", "Volume"]:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    df = df.set_index("Date")
+    df.index.name = "Date"
+
     df = df.sort_index()
+    df = df.dropna(subset=["Close"])
+
+    # 再按用户指定日期范围过滤
+    df = df.loc[start_date:end_date]
+
+    if df.empty:
+        raise ValueError(f"{name_or_ticker} 没有有效行情数据")
 
     return df
 
 
 def get_etfs(
-    names: list,
-    start: str = "2020-01-01",
-    end: str = None,
-    column: str = "Close",
-) -> pd.DataFrame:
-    """
-    批量获取多只ETF的收盘价（或其他列），合并为一个 DataFrame。
+    names,
+    start="2020-01-01",
+    end=None,
+    column="Close",
+    adjust="qfq",
+):
+    """批量获取多只 ETF 行情。"""
 
-    参数：
-        names:  ETF名称列表，如 ["沪深300", "中证红利", "黄金ETF"]
-        start:  开始日期
-        end:    结束日期
-        column: 要提取的列，默认 "Close"
-
-    返回：
-        DataFrame，每列为一只ETF，索引为日期
-    """
     result = pd.DataFrame()
     failed = []
 
     for name in names:
         try:
-            df = get_etf(name, start=start, end=end)
-            if column in df.columns and len(df) > 0:
+            df = get_etf(
+                name,
+                start=start,
+                end=end,
+                adjust=adjust,
+            )
+
+            if column in df.columns:
                 result[name] = df[column]
             else:
                 failed.append(name)
+
         except Exception as e:
+            print(f"⚠️ {name} 获取失败：{e}")
             failed.append(name)
 
     if failed:
-        print(f"⚠️ 以下ETF获取失败: {failed}")
+        print(f"以下 ETF 获取失败：{failed}")
 
-    # 前向填充缺失值（交易日不一致时）
+    result = result.sort_index()
     result = result.dropna(how="all").ffill()
 
     return result
 
 
-def list_etfs() -> dict:
-    """列出所有内置的ETF代码映射。"""
+def list_etfs():
+    """返回 ETF 名称与代码映射。"""
     return dict(ETF_POOL)
 
 
-def _guess_ticker(code: str) -> str:
-    """
-    根据6位数字代码猜测 yfinance ticker 后缀。
-    上海：51xxxx, 510xxx, 511xxx, 512xxx, 513xxx, 515xxx, 518xxx, 560xxx, 563xxx, 588xxx
-    深圳：15xxxx, 159xxx
-    """
-    code = code.strip()
-    if code.startswith("5") or code.startswith("0"):
-        return f"{code}.SS"
-    elif code.startswith("1"):
-        return f"{code}.SZ"
-    else:
-        return f"{code}.SS"
+def _guess_ticker(code):
+    """兼容旧版本调用。"""
+    return _normalize_code(code)

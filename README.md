@@ -192,8 +192,8 @@ ezquant/
 │   ├── data.py        # 数据获取
 │   ├── strategy.py    # 5大策略
 │   ├── backtest.py    # 回测引擎
-│   ├── portfolio.py   # 组合管理
-│   ├── signal.py      # 信号生成
+│   ├── portfolio.py   # 组合管理:研究多只ETF组成的投资组合
+│   ├── signal.py      # 信号生成:生成每日ETF分析报告。
 │   └── plot.py        # 可视化
 ├── examples/
 │   ├── quickstart.py              # 5分钟快速体验
