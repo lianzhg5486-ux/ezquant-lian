@@ -21,9 +21,11 @@ import numpy as np
 
 
 def ma_crossover(
+    # 收盘价\短期长期均线
     close: pd.Series,
     fast: int = 10,
     slow: int = 30,
+    # 表示这个函数返回一个 Pandas一维数据序列
 ) -> pd.Series:
     """
     均线交叉策略（金叉买、死叉卖）
@@ -40,10 +42,11 @@ def ma_crossover(
     返回：
         持仓信号 Series（1=持有, 0=空仓）
     """
+    # 取最近X个交易日的数据，取最近10个交易日的数据
     ma_fast = close.rolling(fast).mean()
     ma_slow = close.rolling(slow).mean()
 
-    # 短均线在长均线上方时持有
+    # 短均线在长均线上方时持有,当短期均线高于长期均线时，信号就是1；否则就是0
     signal = (ma_fast > ma_slow).astype(int)
 
     # 前 slow 个交易日无信号
@@ -74,16 +77,19 @@ def momentum(
     返回：
         持仓信号 Series（1=持有, 0=空仓）
     """
+    #pct_change(20) 就是在计算每一天相对于20个交易日前的涨跌幅
     ret = close.pct_change(lookback)
 
-    # 在评估日决定是否持有
+    # 在评估日决定是否持有,创建一个空仓信号序列
     signal = pd.Series(0, index=close.index)
     position = 0
 
     for i in range(lookback, len(close)):
-        # 每 hold_days 天重新评估
+        # 每 hold_days 天重新评估,每隔X个交易日，重新检查一次过去20天的收益率
         if (i - lookback) % hold_days == 0:
+            #如果过去20天上涨，就持有；如果过去20天下跌或没有上涨，就空仓
             position = 1 if ret.iloc[i] > 0 else 0
+            #记录每天的持仓状态
         signal.iloc[i] = position
 
     signal.name = "momentum"

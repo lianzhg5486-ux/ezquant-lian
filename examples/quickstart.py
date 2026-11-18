@@ -12,7 +12,7 @@ ezquant 快速体验
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+#从 ezquant 文件夹中的 data.py 文件里，把 get_etf 这个函数拿出来使用。
 from ezquant.data import get_etf, get_etfs
 from ezquant.strategy import ma_crossover, rsi_signal, momentum
 from ezquant.backtest import backtest, print_result, compare_strategies
@@ -25,6 +25,7 @@ def main():
 
     # ===== 第1步：获取数据 =====
     print("\n📥 第1步：获取沪深300ETF数据...")
+    #获取沪深300ETF历史行情、从2022年1月1日开始获取数据、只取其中的收盘价
     close = get_etf("沪深300", start="2022-01-01")["Close"]
     print(f"   获取到 {len(close)} 个交易日数据")
     print(f"   时间范围: {close.index[0].strftime('%Y-%m-%d')} ~ {close.index[-1].strftime('%Y-%m-%d')}")
@@ -48,7 +49,7 @@ def main():
     # ===== 第3步：回测 =====
     print("\n📈 第3步：回测各策略...")
 
-    result_ma = backtest(close, signal_ma)
+    result_ma = backtest(close, signal_ma)  # ETF历史价格、策略持仓信号传递给回测
     print_result(result_ma, "均线交叉(10/30)")
 
     result_rsi = backtest(close, signal_rsi)
