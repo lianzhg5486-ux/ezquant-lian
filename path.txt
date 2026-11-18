@@ -1,0 +1,6 @@
+$env:Path += ";D:\Program Files\Git\cmd"
+git --version
+git remote -v
+git config --global http.proxy http://127.0.0.1:7890
+git config --global https.proxy http://127.0.0.1:7890
+Test-NetConnection 127.0.0.1 -Port 7890
