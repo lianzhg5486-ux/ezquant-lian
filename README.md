@@ -1,225 +1,367 @@
-# ezquant 📊
+# ezquant-lian 📊
 
-**轻量级A股量化投资工具包** —— 简洁、实用、开箱即用。
+**轻量级 A 股 ETF 量化研究工具包**
 
-> 用 Python 做量化，不必从轮子造起。`pip install` 即可开始。
+本项目 Fork 自 [lancelin111/ezquant](https://github.com/lancelin111/ezquant)，在原项目基础上持续开发和完善，主要用于 ETF 行情获取、量化策略研究、历史回测、投资组合分析及每日信号生成。
 
----
-
-## ✨ 功能亮点
-
-| 功能 | 说明 |
-|------|------|
-| 📥 **一键获取数据** | 内置16只常用A股ETF，中文名直接调用 |
-| 📊 **5大经典策略** | 均线交叉、动量、低波轮动、RSI超买超卖、网格交易 |
-| 📈 **向量化回测** | 秒级回测，自动计算年化收益、最大回撤、夏普比率 |
-| 💼 **组合管理** | 资产配置、相关性分析、再平衡建议、风险贡献 |
-| 🔔 **每日信号** | 一键生成ETF买卖信号报告 |
-| 🎨 **专业可视化** | 收益曲线、回撤图、持仓饼图、相关性热力图 |
-
-## 📊 回测实战
-
-> 以下数据为真实运行结果，数据区间 2022-01-04 ~ 2026-02-09（约994个交易日）。
-
-### 🏆 策略对比 — 沪深300ETF
-
-| 策略 | 年化收益 | 最大回撤 | 夏普比率 | 超额收益 |
-|------|---------|---------|---------|---------|
-| 动量策略(20日) | +4.15% | -15.54% | 0.23 | +12.67% |
-| 均线交叉(10/30) | +3.36% | -16.32% | 0.17 | +9.22% |
-| RSI超买超卖(14) | -1.31% | -21.05% | -0.22 | -9.77% |
-| 买入持有（基准） | +1.17% | -32.69% | — | — |
-
-> 💡 动量策略表现最佳，年化+4.15%、最大回撤仅-15.54%，显著优于买入持有。
-
-![策略对比](docs/images/strategy_comparison.png)
-
-![回撤曲线](docs/images/drawdown.png)
-
-### 🔄 ETF低波轮动
-
-每月从6只ETF中选取近期正收益、波动最低的3只等权持有。
-
-| 指标 | 低波轮动 | 等权买入持有 |
-|------|---------|-------------|
-| 年化收益 | +12.77% | — |
-| 最大回撤 | -8.81% | — |
-| 夏普比率 | 1.06 | — |
-| 总收益 | +60.63% | +51.65% |
-
-> 💡 低波轮动夏普比率达1.06，最大回撤控制在-8.81%，风险收益比优秀。
-
-![ETF轮动结果](docs/images/etf_rotation_result.png)
-
-### 💼 组合优化
-
-三种风格组合对比（2022-01 至今）：
-
-| 组合 | 配置 | 年化收益 | 最大回撤 | 夏普比率 |
-|------|------|---------|---------|---------|
-| 保守型 | 60%债券 + 20%红利 + 20%黄金 | +9.59% | -4.26% | 1.49 |
-| 均衡型 | 30%债券 + 30%红利 + 20%宽基 + 20%黄金 | +9.84% | -6.84% | 0.88 |
-| 进取型 | 40%宽基 + 30%红利 + 20%纳指 + 10%黄金 | +9.44% | -16.59% | 0.58 |
-
-> 💡 保守型组合年化9.59%、最大回撤仅-4.26%、夏普1.49，适合稳健投资者。
-
-![资产配置](docs/images/portfolio_allocation.png)
-
-![相关性热力图](docs/images/correlation.png)
+项目使用 Python 开发，通过 AkShare 获取行情数据。
 
 ---
 
-## 📦 安装
+## ✨ 主要功能
 
-```bash
-pip install ezquant
-```
+| 功能模块 | 功能说明 |
+|---|---|
+| 行情数据 | ETF、指数历史行情获取，支持单只及批量获取 |
+| 交易策略 | 均线交叉、动量、低波轮动、RSI、网格交易 |
+| 回测引擎 | 历史策略回测，计算收益率、最大回撤、夏普比率等 |
+| 组合管理 | 多 ETF 资产配置、相关性分析、年度收益、再平衡建议 |
+| 每日信号 | 自动生成 ETF 技术面分析、低波轮动信号及异常提醒 |
+| 数据可视化 | 收益曲线、回撤曲线、资产配置及相关性图表 |
 
-或者从源码安装：
-
-```bash
-git clone https://github.com/yourname/ezquant.git
-cd ezquant
-pip install -e .
-```
-
-## 🚀 5分钟快速开始
-
-### 1️⃣ 获取数据
-
-```python
-from ezquant import get_etf, get_etfs
-
-# 用中文名获取沪深300ETF数据
-df = get_etf("沪深300", start="2023-01-01")
-print(df.tail())
-
-# 批量获取多只ETF收盘价
-prices = get_etfs(["沪深300", "中证红利", "黄金ETF", "国债ETF"])
-```
-
-### 2️⃣ 运行策略
-
-```python
-from ezquant import ma_crossover, rsi_signal, momentum
-
-close = get_etf("沪深300", start="2022-01-01")["Close"]
-
-# 均线交叉策略（10日线上穿30日线买入）
-signal = ma_crossover(close, fast=10, slow=30)
-
-# RSI策略（超卖买入，超买卖出）
-signal_rsi = rsi_signal(close)
-
-# 动量策略（涨势持有）
-signal_mom = momentum(close)
-```
-
-### 3️⃣ 回测
-
-```python
-from ezquant import backtest
-from ezquant.backtest import print_result
-
-result = backtest(close, signal)
-print_result(result, "均线交叉策略")
-
-# 输出：
-# ================================================
-# 📊 均线交叉策略 回测报告
-# ================================================
-#   总收益率:        +12.35%
-#   年化收益率:       +5.82%
-#   最大回撤:         -8.23%
-#   夏普比率:          0.85
-#   ...
-```
-
-### 4️⃣ 可视化
-
-```python
-from ezquant.plot import plot_returns, plot_drawdown
-
-# 收益曲线（策略 vs 买入持有）
-plot_returns(result["nav"], result["benchmark_nav"])
-
-# 回撤曲线
-plot_drawdown(result["nav"])
-```
-
-### 5️⃣ 每日信号
-
-```python
-from ezquant import generate_signals
-
-# 生成今日ETF信号分析
-report = generate_signals()
-print(report)
-```
-
-### 6️⃣ 组合管理
-
-```python
-from ezquant import Portfolio
-
-# 构建均衡组合
-port = Portfolio({
-    "国债ETF": 0.3,
-    "中证红利": 0.3,
-    "沪深300": 0.2,
-    "黄金ETF": 0.2,
-})
-port.load_data(start="2022-01-01")
-port.summary()  # 打印绩效、相关性、再平衡建议
-```
-
-## 📋 内置ETF池
-
-| 类别 | ETF | 代码 |
-|------|-----|------|
-| 红利 | 中证红利、红利低波、红利ETF | 515080, 512890, 510880 |
-| 债券 | 国债ETF、十年国债 | 511010, 511260 |
-| 商品 | 黄金ETF | 518880 |
-| 宽基 | 沪深300、中证500、上证50、创业板 | 510300, 510500, 510050, 159915 |
-| 行业 | 医药ETF、消费ETF、银行ETF | 512010, 159928, 512800 |
-| 跨境 | 纳指ETF、标普500、恒生ETF | 513100, 513500, 159920 |
-
-## 📂 项目结构
-
-```
-ezquant/
-├── ezquant/
-│   ├── data.py        # 数据获取
-│   ├── strategy.py    # 5大策略
-│   ├── backtest.py    # 回测引擎
-│   ├── portfolio.py   # 组合管理:研究多只ETF组成的投资组合
-│   ├── signal.py      # 信号生成:生成每日ETF分析报告。
-│   └── plot.py        # 可视化
-├── examples/
-│   ├── quickstart.py              # 5分钟快速体验
-│   ├── etf_rotation.py            # ETF轮动策略
-│   └── portfolio_optimization.py  # 组合优化
-├── README.md
-├── setup.py
-└── requirements.txt
-```
-
-## 🔧 依赖
+## 📦 安装与环境
 
 - Python >= 3.8
-- yfinance
+- AkShare
 - pandas
 - numpy
 - matplotlib
 
-## ⚠️ 免责声明
+### 1. 克隆项目
 
-本工具仅供学习研究使用，不构成任何投资建议。股市有风险，入市需谨慎。历史表现不代表未来收益。
+```bash
+git clone https://github.com/lianzhg5486-ux/ezquant-lian.git
+cd ezquant-lian
+```
 
-## 📄 License
+### 2. 安装依赖
 
-[MIT License](LICENSE)
+```bash
+pip install -r requirements.txt
+```
+
+### 3. 运行快速示例
+
+```bash
+python examples/quickstart.py
+```
 
 ---
 
-**如果觉得有用，请给个 ⭐ Star！**
+## 📊 当前 ETF 池
+
+项目目前仅维护以下 5 只 ETF：
+
+| ETF 名称 | 代码 | 类型 |
+|---|---|---|
+| 证券ETF | 512880 | 券商行业 |
+| 中概互联网ETF | 513050 | 跨境互联网 |
+| 沪深300ETF | 510300 | 宽基指数 |
+| 创业板ETF | 159915 | 宽基指数 |
+| 国债ETF | 511010 | 债券资产 |
+
+ETF 名称及代码统一维护在 `ezquant/data.py` 中的 `ETF_POOL`。
+
+每日信号模块默认动态读取当前 ETF 池：
+
+```python
+DEFAULT_ETFS = list(ETF_POOL.keys())
+```
+
+新增或删除 ETF 时，无需再单独维护默认分析名单。
+
+---
+
+## 🌐 数据源说明
+
+项目统一使用 **AkShare** 作为行情数据接口库。
+
+当前使用的数据接口：
+
+| 数据类型 | AkShare 接口 | 底层数据来源 |
+|---|---|---|
+| ETF 历史行情 | `fund_etf_hist_sina` | 新浪财经 |
+| 普通指数行情 | `index_zh_daily_sina` | 新浪财经 |
+| 中证指数行情 | `index_hist_csindex` | 中证指数 |
+
+### 当前支持的指数
+
+| 指数名称 | 指数代码 | 数据来源 |
+|---|---|---|
+| 证券公司指数 | 399975 | 新浪财经 |
+| 中证海外中国互联网50 | H30533 | 中证指数 |
+| 沪深300指数 | 000300 | 新浪财经 |
+| 创业板指 | 399006 | 新浪财经 |
+
+### 数据处理原则
+
+1. 统一通过 AkShare 获取行情，不在业务代码中直接编写网站请求。
+2. 优先选择非东方财富的数据接口。
+3. 不同数据源返回的数据统一转换为项目内部标准字段。
+4. 对于数据源未提供的字段，保留缺失值，不人为补造。
+5. 数据接口不可用时，可在 AkShare 内寻找其他合适的数据接口进行替换。
+
+**当前数据限制：**
+
+- ETF 使用新浪历史行情接口，目前获取的是不复权数据。
+- 当前 ETF 接口不支持前复权和后复权，`adjust` 仅支持默认空字符串。
+- 新浪普通指数接口不提供成交金额和 PE 等部分字段，缺失值保留为 NaN。
+- 部分中证指数数据可能缺少 OHLC 字段，按实际返回情况处理。
+
+---
+
+## 🚀 快速使用
+
+### 1. 获取单只 ETF 行情
+
+```python
+from ezquant import get_etf
+
+# 获取沪深300ETF历史行情
+df = get_etf("沪深300ETF", start="2024-01-01")
+
+print(df.tail())
+```
+
+返回字段：
+
+`Open`、`High`、`Low`、`Close`、`Volume`、`Amount`。
+
+### 2. 批量获取 ETF 收盘价
+
+```python
+from ezquant import get_etfs, ETF_POOL
+
+# 获取当前 ETF 池中的全部标的
+prices = get_etfs(
+    list(ETF_POOL.keys()),
+    start="2024-01-01"
+)
+
+print(prices.tail())
+```
+
+返回 DataFrame，每列对应一只 ETF，每行对应一个交易日。
+
+### 3. 获取指数行情
+
+```python
+from ezquant import get_index
+
+df = get_index(
+    "沪深300指数",
+    start="2024-01-01"
+)
+
+print(df.tail())
+```
+
+### 4. 使用交易策略
+
+```python
+from ezquant import get_etf
+from ezquant.strategy import (
+    ma_crossover,
+    momentum,
+    rsi_signal
+)
+
+close = get_etf(
+    "沪深300ETF",
+    start="2022-01-01"
+)["Close"]
+
+# 均线交叉策略
+signal_ma = ma_crossover(
+    close,
+    fast=10,
+    slow=30
+)
+
+# 动量策略
+signal_mom = momentum(
+    close,
+    lookback=20,
+    hold_days=5
+)
+
+# RSI策略
+signal_rsi = rsi_signal(
+    close,
+    period=14
+)
+```
+
+信号约定：
+
+- 1：持有
+- 0：空仓
+
+### 5. 策略回测
+
+```python
+from ezquant import get_etf, backtest
+from ezquant.strategy import ma_crossover
+from ezquant.backtest import print_result
+
+close = get_etf(
+    "沪深300ETF",
+    start="2022-01-01"
+)["Close"]
+
+signal = ma_crossover(
+    close,
+    fast=10,
+    slow=30
+)
+
+result = backtest(close, signal)
+
+print_result(result, "均线交叉策略")
+```
+
+回测指标包括：
+
+- 总收益率
+- 年化收益率
+- 最大回撤
+- 夏普比率
+- 年化波动率
+- 胜率及盈亏比
+
+### 6. ETF 低波轮动策略
+
+```python
+from ezquant import get_etfs, ETF_POOL
+from ezquant.strategy import low_volatility_rotation
+
+prices = get_etfs(
+    list(ETF_POOL.keys()),
+    start="2022-01-01"
+)
+
+weights = low_volatility_rotation(
+    prices,
+    lookback_months=3,
+    top_n=3
+)
+
+print(weights.tail())
+```
+
+策略逻辑：
+
+1. 每月进行一次评估。
+2. 筛选过去设定周期收益率为正的 ETF。
+3. 按历史波动率从低到高排序。
+4. 选择波动率最低的前 N 只 ETF 等权持有。
+5. 如果所有 ETF 均不满足条件，且数据中包含国债ETF，则将国债ETF配置为 100%。
+
+### 7. 每日 ETF 信号报告
+
+```python
+from ezquant import generate_signals
+
+# 默认分析当前 ETF 池中的全部标的
+report = generate_signals()
+
+print(report)
+```
+
+也可以指定 ETF：
+
+```python
+report = generate_signals(
+    etf_names=[
+        "证券ETF",
+        "沪深300ETF",
+        "国债ETF"
+    ],
+    start="2024-01-01"
+)
+
+print(report)
+```
+
+报告包含：
+
+- 低波轮动信号
+- ETF 技术面快照
+- RSI 指标
+- 异常波动提醒
+- 操作提示
+
+### 8. 投资组合管理
+
+```python
+from ezquant import Portfolio
+
+portfolio = Portfolio({
+    "国债ETF": 0.5,
+    "沪深300ETF": 0.3,
+    "证券ETF": 0.2
+})
+
+portfolio.load_data(start="2022-01-01")
+
+# 组合绩效
+portfolio.summary()
+
+# 相关性分析
+print(portfolio.correlation())
+
+# 年度收益
+print(portfolio.annual_returns())
+```
+
+---
+
+## 📂 项目结构
+
+```text
+ezquant-lian/
+│
+├── ezquant/
+│   ├── __init__.py       # 项目统一接口
+│   ├── data.py           # ETF及指数行情获取
+│   ├── strategy.py       # 量化交易策略
+│   ├── backtest.py       # 历史回测引擎
+│   ├── portfolio.py      # 投资组合管理
+│   ├── signal.py         # 每日信号生成
+│   └── plot.py           # 数据可视化
+│
+├── examples/
+│   ├── quickstart.py     # 快速体验
+│   ├── test_etfs.py      # ETF数据接口测试
+│   ├── test_indices.py   # 指数数据接口测试
+│   ├── etf_rotation.py   # ETF低波轮动示例
+│   └── portfolio_optimization.py  # 组合优化示例
+│
+├── renew-report/         # 项目变更记录
+│
+├── requirements.txt      # 项目依赖
+├── setup.py              # 安装配置
+└── README.md             # 项目说明
+```
+
+---
+
+## ⚠️ 免责声明
+
+本项目仅用于 Python 学习、量化研究及策略回测，不构成任何投资建议。
+
+历史回测表现不代表未来收益。实际投资还需要考虑交易成本、滑点、流动性、数据质量以及策略失效等风险。
+
+## 📄 License
+
+本项目采用 MIT License，具体以仓库中的 LICENSE 文件为准。
+
+---
+
+**项目地址：**
+
+https://github.com/lianzhg5486-ux/ezquant-lian
+
+**上游项目：**
+
+https://github.com/lancelin111/ezquant
