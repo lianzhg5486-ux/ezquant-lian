@@ -102,56 +102,60 @@ def low_volatility_rotation(
     top_n: int = 3,
 ) -> pd.DataFrame:
     """
-    低波轮动策略（选波动最低且正收益的ETF持有）
+    低波轮动策略
 
     原理：
         每月末评估：
         1. 过去N个月收益为正的ETF入围
         2. 按波动率从低到高排序
         3. 选 top_n 只等权持有
-        4. 若无合格标的，全部持有现金
-
-    参数：
-        prices:          多只ETF收盘价 DataFrame（列名=ETF名称）
-        lookback_months: 回看月数，默认3个月
-        top_n:           持有只数，默认3只
-
-    返回：
-        DataFrame，每列为一只ETF的持仓权重（0~1之间）
+        4. 若无合格标的，全部持有国债ETF（如果数据中包含）
     """
-    # 月度重采样
     monthly = prices.resample("ME").last()
     monthly_ret = monthly.pct_change()
 
-    weights = pd.DataFrame(0.0, index=prices.index, columns=prices.columns)
+    weights = pd.DataFrame(
+        0.0,
+        index=prices.index,
+        columns=prices.columns,
+    )
 
     for i in range(lookback_months, len(monthly)):
-        # 当前月末日期
         month_end = monthly.index[i]
-        # 回看区间收益
-        period_ret = monthly.iloc[i] / monthly.iloc[i - lookback_months] - 1
-        # 回看区间月度波动率
-        period_vol = monthly_ret.iloc[i - lookback_months + 1 : i + 1].std()
 
-        # 筛选：正收益
-        candidates = period_ret[period_ret > 0].index.tolist()
+        if i + 1 < len(monthly):
+            next_month_end = monthly.index[i + 1]
+            mask = (
+                (prices.index > month_end)
+                & (prices.index <= next_month_end)
+            )
+        else:
+            mask = prices.index > month_end
+
+        period_ret = (
+            monthly.iloc[i]
+            / monthly.iloc[i - lookback_months]
+            - 1
+        )
+
+        period_vol = monthly_ret.iloc[
+            i - lookback_months + 1 : i + 1
+        ].std()
+
+        candidates = period_ret[
+            period_ret > 0
+        ].index.tolist()
+
+        # 所有ETF都不满足条件时，持有国债ETF
         if not candidates:
-            # 无合格标的，空仓（等价于持有现金）
+            if "国债ETF" in weights.columns:
+                weights.loc[mask, "国债ETF"] = 1.0
             continue
 
-        # 按波动率排序，取最低的 top_n
         vols = period_vol[candidates].sort_values()
         selected = vols.index[:top_n].tolist()
 
-        # 等权
         w = 1.0 / len(selected)
-
-        # 找到下一个月的交易日范围
-        if i + 1 < len(monthly):
-            next_month_end = monthly.index[i + 1]
-            mask = (prices.index > month_end) & (prices.index <= next_month_end)
-        else:
-            mask = prices.index > month_end
 
         for etf in selected:
             weights.loc[mask, etf] = w

@@ -17,12 +17,8 @@ from ezquant.data import get_etfs, ETF_POOL
 from ezquant.strategy import compute_rsi
 
 
-# 默认分析的ETF列表
-DEFAULT_ETFS = [
-    "中证红利", "红利低波", "国债ETF", "十年国债",
-    "黄金ETF", "沪深300", "中证500", "医药ETF",
-    "恒生ETF", "纳指ETF",
-]
+# 默认分析当前ETF池中的全部标的
+DEFAULT_ETFS = list(ETF_POOL.keys())
 
 
 def generate_signals(
