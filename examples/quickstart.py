@@ -26,7 +26,7 @@ def main():
     # ===== 第1步：获取数据 =====
     print("\n📥 第1步：获取沪深300ETF数据...")
     #获取沪深300ETF历史行情、从2022年1月1日开始获取数据、只取其中的收盘价
-    close = get_etf("沪深300", start="2022-01-01")["Close"]
+    close = get_etf("沪深300ETF", start="2022-01-01")["Close"]
     print(f"   获取到 {len(close)} 个交易日数据")
     print(f"   时间范围: {close.index[0].strftime('%Y-%m-%d')} ~ {close.index[-1].strftime('%Y-%m-%d')}")
     print(f"   最新价格: {close.iloc[-1]:.3f}")
