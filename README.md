@@ -2,9 +2,11 @@
 
 **轻量级 A 股 ETF 量化研究工具包**
 
-本项目 Fork 自 [lancelin111/ezquant](https://github.com/lancelin111/ezquant)，在原项目基础上持续开发和完善，主要用于 ETF 行情获取、量化策略研究、历史回测、投资组合分析及每日信号生成。
+本项目 Fork 自 [lancelin111/ezquant](https://github.com/lancelin111/ezquant)，在原项目基础上持续开发和完善。
 
-项目使用 Python 开发，通过 AkShare 获取行情数据。
+项目使用 Python 开发，基于 AkShare 获取 ETF 和指数行情，提供量化策略、历史回测、投资组合分析及信号生成等功能。
+
+项目目前以个人量化研究和学习为主要目标，持续完善数据接口与核心功能。
 
 ---
 
@@ -16,16 +18,19 @@
 | 交易策略 | 均线交叉、动量、低波轮动、RSI、网格交易 |
 | 回测引擎 | 历史策略回测，计算收益率、最大回撤、夏普比率等 |
 | 组合管理 | 多 ETF 资产配置、相关性分析、年度收益、再平衡建议 |
-| 每日信号 | 自动生成 ETF 技术面分析、低波轮动信号及异常提醒 |
+| 每日信号 | ETF 技术面分析、低波轮动信号及异常提醒 |
 | 数据可视化 | 收益曲线、回撤曲线、资产配置及相关性图表 |
 
 ## 📦 安装与环境
+
+### 环境要求
 
 - Python >= 3.8
 - AkShare
 - pandas
 - numpy
 - matplotlib
+- requests
 
 ### 1. 克隆项目
 
@@ -40,17 +45,11 @@ cd ezquant-lian
 pip install -r requirements.txt
 ```
 
-### 3. 运行快速示例
-
-```bash
-python examples/quickstart.py
-```
-
 ---
 
 ## 📊 当前 ETF 池
 
-项目目前仅维护以下 5 只 ETF：
+项目目前维护以下 5 只 ETF：
 
 | ETF 名称 | 代码 | 类型 |
 |---|---|---|
@@ -62,13 +61,17 @@ python examples/quickstart.py
 
 ETF 名称及代码统一维护在 `ezquant/data.py` 中的 `ETF_POOL`。
 
-每日信号模块默认动态读取当前 ETF 池：
-
 ```python
-DEFAULT_ETFS = list(ETF_POOL.keys())
+ETF_POOL = {
+    "证券ETF": "512880",
+    "中概互联网ETF": "513050",
+    "沪深300ETF": "510300",
+    "创业板ETF": "159915",
+    "国债ETF": "511010",
+}
 ```
 
-新增或删除 ETF 时，无需再单独维护默认分析名单。
+每日信号模块默认动态读取当前 ETF 池，无需重复维护 ETF 名单。
 
 ---
 
@@ -101,7 +104,7 @@ DEFAULT_ETFS = list(ETF_POOL.keys())
 4. 对于数据源未提供的字段，保留缺失值，不人为补造。
 5. 数据接口不可用时，可在 AkShare 内寻找其他合适的数据接口进行替换。
 
-**当前数据限制：**
+### 当前数据限制
 
 - ETF 使用新浪历史行情接口，目前获取的是不复权数据。
 - 当前 ETF 接口不支持前复权和后复权，`adjust` 仅支持默认空字符串。
@@ -110,14 +113,13 @@ DEFAULT_ETFS = list(ETF_POOL.keys())
 
 ---
 
-## 🚀 快速使用
+## 🚀 核心功能使用
 
 ### 1. 获取单只 ETF 行情
 
 ```python
 from ezquant import get_etf
 
-# 获取沪深300ETF历史行情
 df = get_etf("沪深300ETF", start="2024-01-01")
 
 print(df.tail())
@@ -127,12 +129,11 @@ print(df.tail())
 
 `Open`、`High`、`Low`、`Close`、`Volume`、`Amount`。
 
-### 2. 批量获取 ETF 收盘价
+### 2. 批量获取 ETF 行情
 
 ```python
 from ezquant import get_etfs, ETF_POOL
 
-# 获取当前 ETF 池中的全部标的
 prices = get_etfs(
     list(ETF_POOL.keys()),
     start="2024-01-01"
@@ -156,15 +157,15 @@ df = get_index(
 print(df.tail())
 ```
 
+统一返回字段：
+
+`Open`、`High`、`Low`、`Close`、`Volume`、`Amount`、`Change`、`ChangePct`、`PE`。
+
 ### 4. 使用交易策略
 
 ```python
 from ezquant import get_etf
-from ezquant.strategy import (
-    ma_crossover,
-    momentum,
-    rsi_signal
-)
+from ezquant.strategy import ma_crossover, momentum, rsi_signal
 
 close = get_etf(
     "沪深300ETF",
@@ -172,24 +173,13 @@ close = get_etf(
 )["Close"]
 
 # 均线交叉策略
-signal_ma = ma_crossover(
-    close,
-    fast=10,
-    slow=30
-)
+signal_ma = ma_crossover(close, fast=10, slow=30)
 
 # 动量策略
-signal_mom = momentum(
-    close,
-    lookback=20,
-    hold_days=5
-)
+signal_mom = momentum(close, lookback=20, hold_days=5)
 
-# RSI策略
-signal_rsi = rsi_signal(
-    close,
-    period=14
-)
+# RSI 策略
+signal_rsi = rsi_signal(close, period=14)
 ```
 
 信号约定：
@@ -209,11 +199,7 @@ close = get_etf(
     start="2022-01-01"
 )["Close"]
 
-signal = ma_crossover(
-    close,
-    fast=10,
-    slow=30
-)
+signal = ma_crossover(close, fast=10, slow=30)
 
 result = backtest(close, signal)
 
@@ -226,8 +212,10 @@ print_result(result, "均线交叉策略")
 - 年化收益率
 - 最大回撤
 - 夏普比率
+- Calmar 比率
 - 年化波动率
 - 胜率及盈亏比
+- 交易次数
 
 ### 6. ETF 低波轮动策略
 
@@ -255,7 +243,7 @@ print(weights.tail())
 2. 筛选过去设定周期收益率为正的 ETF。
 3. 按历史波动率从低到高排序。
 4. 选择波动率最低的前 N 只 ETF 等权持有。
-5. 如果所有 ETF 均不满足条件，且数据中包含国债ETF，则将国债ETF配置为 100%。
+5. 如果所有 ETF 均不满足条件，且数据中包含国债 ETF，则将国债 ETF 配置为 100%。
 
 ### 7. 每日 ETF 信号报告
 
@@ -272,11 +260,7 @@ print(report)
 
 ```python
 report = generate_signals(
-    etf_names=[
-        "证券ETF",
-        "沪深300ETF",
-        "国债ETF"
-    ],
+    etf_names=["证券ETF", "沪深300ETF", "国债ETF"],
     start="2024-01-01"
 )
 
@@ -312,6 +296,9 @@ print(portfolio.correlation())
 
 # 年度收益
 print(portfolio.annual_returns())
+
+# 再平衡建议
+print(portfolio.rebalance_suggestion())
 ```
 
 ---
@@ -321,28 +308,41 @@ print(portfolio.annual_returns())
 ```text
 ezquant-lian/
 │
-├── ezquant/
-│   ├── __init__.py       # 项目统一接口
-│   ├── data.py           # ETF及指数行情获取
-│   ├── strategy.py       # 量化交易策略
-│   ├── backtest.py       # 历史回测引擎
-│   ├── portfolio.py      # 投资组合管理
-│   ├── signal.py         # 每日信号生成
-│   └── plot.py           # 数据可视化
+├── ezquant/                       # 核心量化功能模块
+│   ├── __init__.py                # 项目统一接口
+│   ├── data.py                    # ETF及指数行情获取
+│   ├── strategy.py                # 量化交易策略
+│   ├── backtest.py                # 历史回测引擎
+│   ├── portfolio.py               # 投资组合管理
+│   ├── signal.py                  # 每日信号生成
+│   └── plot.py                    # 数据可视化
 │
-├── examples/
-│   ├── quickstart.py     # 快速体验
-│   ├── test_etfs.py      # ETF数据接口测试
-│   ├── test_indices.py   # 指数数据接口测试
-│   ├── etf_rotation.py   # ETF低波轮动示例
-│   └── portfolio_optimization.py  # 组合优化示例
+├── examples/                      # 示例程序
+│   ├── quickstart.py
+│   ├── etf_rotation.py
+│   └── portfolio_optimization.py
 │
-├── renew-report/         # 项目变更记录
+├── docs/                          # 项目文档
 │
-├── requirements.txt      # 项目依赖
-├── setup.py              # 安装配置
-└── README.md             # 项目说明
+├── renew-report/                  # 项目变更记录
+│
+├── requirements.txt               # 项目依赖
+├── setup.py                       # 安装配置
+├── upload_github.py               # GitHub上传辅助脚本
+└── README.md                      # 项目说明
 ```
+
+---
+
+## 🛠️ 项目开发计划
+
+项目采用逐步完善的方式进行开发：
+
+1. 完成 AkShare 行情数据接口适配。
+2. 验证 `ezquant` 核心模块的运行情况。
+3. 完善策略与回测功能。
+4. 逐步开展 ETF 策略研究和实盘前验证。
+5. 后续根据实际需求扩展数据分析及可视化功能。
 
 ---
 
