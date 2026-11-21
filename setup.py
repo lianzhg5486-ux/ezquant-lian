@@ -14,7 +14,7 @@ setup(
     description="轻量级A股量化投资工具包 - 简单易用的量化投资工具",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourname/ezquant",
+    url="https://github.com/lianzhg5486-ux/ezquant-lian",
     packages=find_packages(),
     python_requires=">=3.8",
     install_requires=requirements,

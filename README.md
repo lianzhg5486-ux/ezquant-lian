@@ -20,6 +20,7 @@
 | 组合管理 | 多 ETF 资产配置、相关性分析、年度收益、再平衡建议 |
 | 每日信号 | ETF 技术面分析、低波轮动信号及异常提醒 |
 | 数据可视化 | 收益曲线、回撤曲线、资产配置及相关性图表 |
+| 指数估值 | 蛋卷基金指数估值数据获取、PE/PB历史百分位、ROE及股息率分析 |
 
 ## 📦 安装与环境
 
@@ -77,15 +78,35 @@ ETF_POOL = {
 
 ## 🌐 数据源说明
 
-项目统一使用 **AkShare** 作为行情数据接口库。
+项目采用多数据源架构，根据不同数据类型选择合适的数据源。
 
-当前使用的数据接口：
-
-| 数据类型 | AkShare 接口 | 底层数据来源 |
+| 数据类型 | 数据源 | 用途 |
 |---|---|---|
-| ETF 历史行情 | `fund_etf_hist_sina` | 新浪财经 |
-| 普通指数行情 | `index_zh_daily_sina` | 新浪财经 |
-| 中证指数行情 | `index_hist_csindex` | 中证指数 |
+| ETF 历史行情 | AkShare（新浪财经） | ETF历史价格及成交数据 |
+| 普通指数行情 | AkShare（新浪财经） | 指数历史行情 |
+| 中证指数行情 | AkShare（中证指数） | 部分指数历史行情 |
+| 指数当前估值 | 蛋卷基金 | PE、PB、历史百分位、ROE、股息率 |
+### 指数估值数据说明
+
+指数估值数据通过蛋卷基金公开接口获取：
+
+https://danjuanfunds.com/djapi/index_eva/dj
+
+当前支持：
+- PE、PB
+- PE历史百分位、PB历史百分位
+- ROE
+- 股息率
+- 估值状态
+- 估值日期
+
+目前已获取63个指数的估值数据。
+
+注意：
+1. 蛋卷估值接口提供的是当前估值快照。
+2. 当前估值数据与历史行情数据独立存储和使用。
+3. 不将当前估值回填至历史行情，避免回测未来数据泄漏。
+4. 指数是否有估值数据，以蛋卷接口实际覆盖情况为准。
 
 ### 当前支持的指数
 
@@ -301,6 +322,69 @@ print(portfolio.annual_returns())
 print(portfolio.rebalance_suggestion())
 ```
 
+### 9. ETF 指数估值查询
+
+通过 ETF 名称或代码获取其跟踪指数的估值数据。
+
+```python
+from ezquant import get_etf_valuation
+
+# 通过 ETF 名称查询
+result = get_etf_valuation("创业板ETF")
+
+# 也可以通过 ETF 代码查询
+result = get_etf_valuation("159915")
+
+print("ETF名称：", result["etf_name"])
+print("ETF代码：", result["etf_code"])
+
+print("跟踪指数：", result["tracked_index_name"])
+print("指数代码：", result["tracked_index_code"])
+
+print("PE：", result["PE"])
+print("PB：", result["PB"])
+
+print("PE百分位：", f'{result["PE_percentile"]:.2%}')
+print("PB百分位：", f'{result["PB_percentile"]:.2%}')
+
+print("ROE：", f'{result["ROE"]:.2%}')
+print("股息率：", f'{result["dividend_yield"]:.2%}')
+
+print("估值状态：", result["valuation_status"])
+print("估值日期：", result["valuation_date"])
+```
+
+也可以直接查询指数估值：
+
+```python
+from ezquant import get_index_valuation
+
+result = get_index_valuation("沪深300指数")
+
+print(result)
+```
+
+获取全部指数估值：
+
+```python
+from ezquant import get_all_index_valuations
+
+df = get_all_index_valuations()
+
+print(df)
+```
+
+查看蛋卷支持估值的指数：
+
+```python
+from ezquant import list_valuation_indices
+
+indices = list_valuation_indices()
+
+print(indices)
+```
+
+
 ---
 
 ## 📂 项目结构
@@ -316,6 +400,7 @@ ezquant-lian/
 │   ├── portfolio.py               # 投资组合管理
 │   ├── signal.py                  # 每日信号生成
 │   └── plot.py                    # 数据可视化
+    ├── valuation.py                 # 蛋卷指数估值数据获取及查询
 │
 ├── examples/                      # 示例程序
 │   ├── quickstart.py
